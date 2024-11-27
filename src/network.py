@@ -28,3 +28,16 @@ class Network:
 
         return a
 
+    def SDG(self, training_data, epochs, batch_size, eta, test_data=None):
+        for i in range(epochs):
+            np.random.shuffle(training_data)
+            batches = [ training_data[j:batch_size] for j in range(0, len(training_data), batch_size)]
+
+            for batch in batches:
+                self.update_batch(batch, eta)
+
+            if test_data:
+                print(f'Epoch {i} {self.evaluate(test_data)} {len(test_data)}')
+            else:
+                print(f'Epoch {i} was completed!')
+
