@@ -48,7 +48,7 @@ class Network:
 
             if test_data:
                 pass
-                # print(f'Epoch {i} {self.evaluate(test_data)} {len(test_data)}')
+                print(f'Epoch {i} {self.evaluate(test_data)} {len(test_data)}')
             else:
                 print(f'Epoch {i} was completed!')
 
@@ -116,5 +116,8 @@ class Network:
 
         return grad_weights, grad_biases
 
+    def evaluate(self, test_data):
+        results = [(np.argmax(self.feedforward(e), l)) for e, l in test_data]
+        return sum(int(pred == ans) for pred, ans in results)
 
 net = Network([5, 10, 3])
