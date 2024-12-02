@@ -53,14 +53,19 @@ class Network:
                 print(f'Epoch {i} was completed!')
 
     def update_mini_batch(self, mini_batch, eta):
-
         # Gradient accumulators
         grad_w = [np.zeros(w.shape) for w in self.weights]
         grad_b = [np.zeros(b.shape) for b in self.biases]
 
-        for e, l in mini_batch:
+        for i, (e, l) in enumerate(mini_batch, start=1):
             single_grad_w, single_grad_b = self.back_propagation(e, l)
-            grad_w = []
+
+            # online averaging algorithm
+            grad_w = [((i-1)/i) * gw + (1 / i) * s_gw for gw, s_gw in zip(grad_w, single_grad_w)]
+            grad_b = [((i-1)/i) * gb + (1 / i) * s_gb for gb, s_gb in zip(grad_b, single_grad_b)]
+
+        self.weights = [w - eta * gw for w, gw in zip(self.weights, grad_w)]
+        self.biases = [b - eta * gb for b, gb in zip(self.biases, grad_b)]
 
     def back_propagation(self, inputs, labels):
         """
