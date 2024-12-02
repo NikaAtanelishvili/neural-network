@@ -1,4 +1,5 @@
-from itertools import accumulate
+import pickle
+import random
 
 import numpy as np
 
@@ -13,7 +14,7 @@ def sigmoid_derivative(z):
 def cost_derivative(activation, l):
     """Return the vector of partial derivatives"""
     # C is mean squared error
-    return np.subtract(activation - l)
+    return activation - l
 
 
 class Network:
@@ -32,6 +33,21 @@ class Network:
         self.biases = [np.random.randn(y,1) for y in sizes[1:]]
         self.weights = [np.random.randn(y, x) for x, y in zip(sizes[:-1], sizes[1:])]
 
+    def load_model(self, filename):
+        with open(filename, "rb") as f:
+            model_data = pickle.load(f)
+        self.weights = model_data["weights"]
+        self.biases = model_data["biases"]
+
+    def save_model(self, filename):
+        print('model saved')
+        model_data = {
+            "weights": self.weights,
+            "biases": self.biases
+        }
+        with open(filename, "wb") as f:
+            pickle.dump(model_data, f)
+
     def feedforward(self, a):
         for w, b in zip(self.weights, self.biases):
             a = sigmoid(np.dot(w, a) + b)
@@ -40,14 +56,13 @@ class Network:
 
     def sdg(self, training_data, epochs, mini_batch_size, eta, test_data=None):
         for i in range(epochs):
-            np.random.shuffle(training_data)
+            random.shuffle(training_data)
             mini_batches = [ training_data[j:j+mini_batch_size] for j in range(0, len(training_data), mini_batch_size)]
 
             for mini_batch in mini_batches:
                 self.update_mini_batch(mini_batch, eta)
 
-            if test_data:
-                pass
+            if test_data is not None:
                 print(f'Epoch {i} {self.evaluate(test_data)} {len(test_data)}')
             else:
                 print(f'Epoch {i} was completed!')
@@ -102,7 +117,7 @@ class Network:
         delta = cost_derivative(activations[-1], labels) * sigmoid_derivative(z_values[-1]) # BP1
 
         grad_biases[-1] = delta  # BP3
-        grad_weights[-1] = np.dot(activations[-2].T, delta)  # BP4
+        grad_weights[-1] = np.dot(delta, activations[-2].T)  # BP4
 
         # Backpropagate through hidden layers
         for layer in range(2, self.num_layers):
@@ -117,7 +132,5 @@ class Network:
         return grad_weights, grad_biases
 
     def evaluate(self, test_data):
-        results = [(np.argmax(self.feedforward(e), l)) for e, l in test_data]
-        return sum(int(pred == ans) for pred, ans in results)
-
-net = Network([5, 10, 3])
+        results = [(np.argmax(self.feedforward(e)), l) for (e, l) in test_data]
+        return sum(int(pred == ans) for (pred, ans) in results)
