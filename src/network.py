@@ -1,7 +1,9 @@
+import os.path
 import pickle
 import random
 
 import numpy as np
+from matplotlib import pyplot as plt
 
 # THIS WILL BE REPLACED BY ReLu
 # a' = σ(Wa + b)
@@ -15,6 +17,26 @@ def cost_derivative(activation, l):
     """Return the vector of partial derivatives"""
     # C is mean squared error
     return activation - l
+
+
+def visualize_incorrect_predictions(incorrect_predictions, max_images=10):
+    if len(incorrect_predictions) == 0: return
+    num_images = min(len(incorrect_predictions), max_images)
+    fig, axes = plt.subplots(1, num_images, figsize=(10, 5))
+    fig.suptitle("Incorrect Predictions", fontsize=16)
+
+    for i, (pred, image, label) in enumerate(incorrect_predictions[:num_images]):
+        # Reshape the image to 28x28 for visualization
+        img = image.reshape(28, 28)
+
+        # Display the image
+        ax = axes[i]
+        ax.imshow(img, cmap='gray')
+        ax.set_title(f"Pred: {pred}\nTrue: {label}")
+        ax.axis('off')
+
+    plt.tight_layout()
+    plt.show()
 
 
 class Network:
@@ -49,18 +71,22 @@ class Network:
             pickle.dump(model_data, f)
 
     def feedforward(self, a):
+        z_values = []  # To store pre-activations for softmax
         for w, b in zip(self.weights, self.biases):
-            a = sigmoid(np.dot(w, a) + b)
+            z = np.dot(w, a) + b
+            z_values.append(z)
+            a = sigmoid(z)
 
-        return a
+        return z_values[-1], a  # Return the pre-activations of the last layer and activations
 
     def sdg(self, training_data, epochs, mini_batch_size, eta, test_data=None):
         for i in range(epochs):
-            random.shuffle(training_data)
-            mini_batches = [ training_data[j:j+mini_batch_size] for j in range(0, len(training_data), mini_batch_size)]
+            if not os.path.exists('model.pkl'):
+                random.shuffle(training_data)
+                mini_batches = [ training_data[j:j+mini_batch_size] for j in range(0, len(training_data), mini_batch_size)]
 
-            for mini_batch in mini_batches:
-                self.update_mini_batch(mini_batch, eta)
+                for mini_batch in mini_batches:
+                    self.update_mini_batch(mini_batch, eta)
 
             if test_data is not None:
                 print(f'Epoch {i} {self.evaluate(test_data)} {len(test_data)}')
@@ -107,14 +133,21 @@ class Network:
 
         z_values = []  # Store weighted input (z-values) for all layers (Wa + b)
 
-        for weights, biases in zip(self.weights, self.biases):
+        for index, (weights, biases) in enumerate(zip(self.weights, self.biases)):
             z = np.dot(weights, activation) + biases
             z_values.append(z)
-            activation = sigmoid(z)
+
+            if index == len(self.weights) - 1:  # Last layer
+                # Apply softmax for the last layer
+                activation = np.exp(z) / np.sum(np.exp(z), axis=0)
+            else:
+                # Apply sigmoid for hidden layers
+                activation = sigmoid(z)
+
             activations.append(activation)
 
         # Compute output layer error (delta)
-        delta = cost_derivative(activations[-1], labels) * sigmoid_derivative(z_values[-1]) # BP1
+        delta = cost_derivative(activations[-1], labels) # BP1
 
         grad_biases[-1] = delta  # BP3
         grad_weights[-1] = np.dot(delta, activations[-2].T)  # BP4
@@ -132,5 +165,23 @@ class Network:
         return grad_weights, grad_biases
 
     def evaluate(self, test_data):
-        results = [(np.argmax(self.feedforward(e)), l) for (e, l) in test_data]
-        return sum(int(pred == ans) for (pred, ans) in results)
+        incorrect_predictions = []
+
+        test_results = []
+        for (e, l) in test_data:
+            z, res = self.feedforward(e)
+
+            probability_distribution = np.exp(z) / np.sum(np.exp(z), axis=0)
+
+            print(np.array_str(probability_distribution, precision=4, suppress_small=True))
+
+            pred = np.argmax(res)
+
+            test_results.append((pred, l))
+            if pred != l:
+                incorrect_predictions.append((pred, e, l))
+
+        visualize_incorrect_predictions(incorrect_predictions)
+
+        return sum(int(pred == ans) for (pred, ans) in test_results)
+
